@@ -15,7 +15,7 @@ public interface AccessControl {
 
     void remove(Path path, String reader, FileSystem.Permission permission);
 
-    Path getRandomSharedPath(Random random, FileSystem.Permission permission);
+    Path getRandomSharedPath(Random random, FileSystem.Permission permission, String sharee);
     /**
      * Model owners, reader and writers
      */
@@ -103,8 +103,9 @@ public interface AccessControl {
         }
 
         @Override
-        public Path getRandomSharedPath(Random random, FileSystem.Permission permission) {
-
+        public Path getRandomSharedPath(Random random, FileSystem.Permission permission, String sharee) {
+            //TODO: make sharee-specific
+            // for now with two users that are friends this is OK
             AccessControlUnit acu = getAcu(permission);
             List<Path> paths = new ArrayList<>(acu.allowed.keySet());
             Collections.sort(paths);
