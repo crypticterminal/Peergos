@@ -1247,17 +1247,24 @@ public class FileWrapper {
         if (! pointer.capability.isWritable())
             return Futures.errored(new IllegalStateException("Cannot delete file without write access to it"));
 
-        boolean writableParent = parent.isWritable();
-        return (writableParent ? parent.removeChild(this, network, hasher) : CompletableFuture.completedFuture(parent))
-                .thenCompose(updatedParent -> network.synchronizer.applyComplexUpdate(owner(), signingPair(),
-                        (version, committer) -> IpfsTransaction.call(owner(),
-                        tid -> FileWrapper.deleteAllChunks(writableFilePointer(), writableParent ?
-                                parent.signingPair() :
-                                signingPair(), tid, hasher, network, version, committer), network.dhtClient))
-                        .thenApply(b -> {
-                            userContext.sharedWithCache.clearSharedWith(pointer.capability);
-                            return updatedParent;
-                        }));
+        Function<FileWrapper, CompletableFuture<Optional<FileWrapper>>> getParent = fw -> fw == null
+                ? retrieveParent(network).thenApply(parentOpt -> parentOpt)
+                : CompletableFuture.completedFuture(Optional.of(fw));
+
+        return getParent.apply(parent).thenCompose(parentOpt -> {
+            FileWrapper parentDir = parentOpt.get();
+            boolean writableParent = parentDir.isWritable();
+            return (writableParent ? parentDir.removeChild(this, network, hasher) : CompletableFuture.completedFuture(parentDir))
+                    .thenCompose(updatedParent -> network.synchronizer.applyComplexUpdate(owner(), signingPair(),
+                            (version, committer) -> IpfsTransaction.call(owner(),
+                                    tid -> FileWrapper.deleteAllChunks(writableFilePointer(), writableParent ?
+                                            parentDir.signingPair() :
+                                            signingPair(), tid, hasher, network, version, committer), network.dhtClient))
+                            .thenApply(b -> {
+                                userContext.sharedWithCache.clearSharedWith(pointer.capability);
+                                return updatedParent;
+                            }));
+        });
     }
 
     public static CompletableFuture<Snapshot> removeSigningKey(PublicKeyHash signerToRemove,
